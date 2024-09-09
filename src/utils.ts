@@ -2,6 +2,7 @@ import { readJsonSync } from 'fs-extra'
 import fetch from 'node-fetch'
 import { resolve } from 'path'
 import _ from 'lodash'
+// import { shipRemodelInfoSelector } from 'subtender/poi'
 
 const { name, version } = readJsonSync(resolve(__dirname, '../package.json'))
 
@@ -38,7 +39,9 @@ export const sendData = async (path: string, data: any) => {
     }
     return response
   } catch (err) {
-    console.error(err.stack)
+    if (err instanceof Error) {
+      console.error(err.stack)
+    }
     return
   }
 }
@@ -71,16 +74,18 @@ const getPrevIds = (): { [_: number]: number | null } =>
     .mapValues((es, forId) => getActualPrevId(es, forId))
     .value()
 
-const getBaseId = (shipId: number, prevIds: { [_: number]: number | null }): number => {
+const getBaseId = (shipId: number, prevIds: { [_: number]: number | null }, useSort: boolean = false): number => {
   for (let i = 0, id = shipId; i < 10; ++i) {
     const prev = prevIds[id]
-    if (!prev) {
+    if (!prev || (useSort && (window as any).$ships[id].api_sort_id % 10 === 1)) {
       return id
     }
     id = prev
   }
-  console.warn(name, 'getBaseId', `can't find base id for ${shipId}`)
-  return shipId
+  if (useSort) {
+    console.warn(name, 'getBaseId', `can't find base id for ${shipId}`)
+  }
+  return useSort ? shipId : getBaseId(shipId, prevIds, true)
 }
 
 export const getShipCounts = (): { [_: number]: number } => {
@@ -89,3 +94,21 @@ export const getShipCounts = (): { [_: number]: number } => {
     .countBy(e => getBaseId(e.api_ship_id, prevIds))
     .value()
 }
+
+// export const getShipCounts = (): { [_: number]: number } => {
+//   const poiState = (window as any).getStore()
+//   const { originMstIdOf } = shipRemodelInfoSelector(poiState)
+
+//   const getBaseId = (shipId: number): number => {
+//     const base = originMstIdOf[shipId]
+//     if (!base) {
+//       console.warn(name, 'getBaseId', `can't find base id for ${shipId}`)
+//       return shipId
+//     }
+//     return base
+//   }
+
+//   return _((window as any)._ships)
+//     .countBy(e => getBaseId(e.api_ship_id))
+//     .value()
+// }
